@@ -8,7 +8,7 @@
 get_bne_pt_route_geom <- function(gtfs_source = "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip") {
   ## get bne lga boundary as ref
   bne_lga <- strayr::read_absmap(name = "lga2022", remove_year_suffix = TRUE) %>%
-    filter(lga_code == 31000)
+    filter(lga_code == 31000) %>% st_buffer(100)
 
   ## Create PT routes
   # read gtfs
@@ -42,7 +42,7 @@ get_bne_pt_route_geom <- function(gtfs_source = "https://gtfsrt.api.translink.co
       by = "route_id") %>%
     left_join(seq$stop_times %>% distinct(trip_id, stop_id), by = "trip_id") %>%
     distinct(route_type, stop_id) %>% right_join(
-      seq$stops %>% distinct(stop_id, stop_name, stop_lon, stop_lat), by = "stop_id") %>%
+      seq$stops %>% distinct(parent_station, stop_id, stop_name, stop_lon, stop_lat), by = "stop_id") %>%
     rename(mode = route_type) %>% st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4326) %>%
     st_filter(bne_lga)
 
