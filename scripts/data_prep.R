@@ -28,15 +28,24 @@ divider_cal <-
   reframe(day_cnt = n_distinct(dt), hours_cnt = n())
 
 
+# bne stop ids
+bne_stop_ids <- bne_stops %>% filter(!is.na(mode)) %>% distinct(mode, stop_id, stop_name)
 
 
-
-pt_stop_type_geom <-
-  bne$gtfs$routes %>% distinct(route_id, route_type, route_short_name, route_color, route_text_color) %>%
-  mutate(route_type = case_match(route_type, 0 ~ "TRAM", 2 ~ "RAIL", 3 ~ "BUS", 4 ~ "FERRY") # ,
-    # version = str_extract(file_url, pattern = "\\d{8}")
+# aggregation
+t <-
+  trip$trip_schedule %>%
+  filter(stop_id %in% bne_stop_ids$stop_id) %>%
+  distinct(stop_id, service_date, dow, departure_time, route_short_name, trip_headsign) %>% # to remove some data duplication in gtfs deviating headway time
+  mutate(
+    daytype = if_else(dow %in% c("Sat", "Sun"), "weekend", "weekday"),
+    hour = lubridate::hour(departure_time),
+    time_bucket = case_when(
+      between(hour, 7, 18) ~ "0700To1859",
+      between(hour, 19, 21) ~ "1900To2159",
+      TRUE ~ "2200To0659"
+    )
   ) %>%
-  left_join(bne$gtfs$trips %>% distinct(route_id, trip_id, trip_headsign, direction_id),
-    by = "route_id") %>%
-  left_join(bne$gtfs$stop_times %>% distinct(trip_id, stop_id), by = "trip_id") %>%
-  distinct(route_type, stop_id)
+  group_by(stop_id, service_date) %>%
+  arrange(stop_id, service_date, departure_time) %>%
+  mutate(headway_in_seconds = lead(departure_time) - departure_time, stop_id = as.character(stop_id))
